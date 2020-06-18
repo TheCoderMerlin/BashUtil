@@ -1,0 +1,5 @@
+#!/bin/bash
+#
+# Displays the most recent file matching the specified pattern
+# e.g. mrfind /home/me/backup*
+ls -t $1 | head -n 1
