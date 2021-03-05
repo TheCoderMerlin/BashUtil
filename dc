@@ -1,0 +1,136 @@
+#!/bin/bash
+# Wrapper for invoking docker-compose
+# Builds configuration environment and required files accoring to the directory structure:
+# ├── config
+# │   ├── all
+# │   │   ├── copy-source
+# │   │   │   └── etc
+# │   │   │       └── nginx
+# │   │   │           ├── nginx.conf
+# │   │   ├── environment.conf
+# │   │   └── gen-source
+# │   │       └── etc
+# │   │           └── nginx
+# │   │               └── sites-enabled
+# │   │                   ├── codermerlin.com.conf
+# │   └── app
+# │       ├── docker-compose.yml
+# │       ├── docker-compose.yml~
+# │       ├── environment.conf
+# │       ├── environment.conf~
+# │       └── target
+# │           └── etc
+# │               └── nginx
+# │                   ├── nginx.conf
+# │                   └── sites-enabled
+# │                       └── codermerlin.com.conf
+#
+#
+# 1. Loads environment
+#    a. Root (root/docker)
+#    b. Global (config/all)
+#    c. Configuration-specific (config/$configuration)
+# 2. Copies files
+#    a. Files under config/all/copy-source are copied as-is
+#    b. Files under config/all/gen-source are environment-substituted
+#       NB: If substitution is not desired, replace the "$" with "${DOLLAR}"
+
+
+
+set -eu
+
+
+# Gather arguments
+configuration=$1
+shift
+
+# Set parameters
+rootEnvironmentPath=/root/docker
+globalEnvironmentPath=./config/all
+globalEnvironmentCopySourcePath=$globalEnvironmentPath/copy-source
+globalEnvironmentGenSourcePath=$globalEnvironmentPath/gen-source
+configEnvironmentPath=./config/$configuration
+targetEnvironmentPath=$configEnvironmentPath/target
+
+rootEnvironmentPathname=$rootEnvironmentPath/environment.conf
+globalEnvironmentPathname=$globalEnvironmentPath/environment.conf
+configEnvironmentPathname=$configEnvironmentPath/environment.conf
+
+projectName="$(basename $(pwd))-$configuration"
+
+composePathname="docker-compose.yml"
+overrideComposePathname="$configEnvironmentPath/$composePathname"
+
+# Export relevant variables
+# The DOLLAR entry allows us to escape values which we don't want to interpolate
+export DOLLAR='$'
+export configuration
+
+# Validate presence of compose files
+if [ ! -f "$composePathname" ]
+then
+    echo "Unable to find compose file '$composePathname'"
+    exit 1
+fi
+
+if [ ! -f "$overrideComposePathname" ]
+then
+    echo "Unable to find compose file '$overrideComposePathname'"
+    exit 1
+fi
+
+# Validate presence of environment files
+if [ ! -f "$rootEnvironmentPathname" ]
+then
+    echo "Unable to find environment '$rootEnvironmentPathname'"
+    exit 1
+fi
+
+if [ ! -f "$globalEnvironmentPathname" ]
+then
+    echo "Unable to find environment '$globalEnvironmentPathname'"
+    exit 1
+fi
+
+if [ ! -f "$configEnvironmentPathname" ]
+then
+    echo "Unable to find environment '$configEnvironmentPathname'"
+    exit 1
+fi
+
+
+# Load environment
+export $(cat "$rootEnvironmentPathname" | grep -v '^#') > /dev/null
+export $(cat "$globalEnvironmentPathname" | grep -v '^#') > /dev/null
+export $(cat "$configEnvironmentPathname" | grep -v '^#') > /dev/null
+
+# Remove the target configuration directory to eliminate stale files
+rm -rf "$targetEnvironmentPath"
+
+# Copy to the corresponding configuration directory files from the CopySource path as-is
+for source in $(find "$globalEnvironmentCopySourcePath"  -mindepth 1 -type f -print | grep -v "~$")
+do
+    # The target directory 
+    target="$targetEnvironmentPath${source##$globalEnvironmentCopySourcePath}"
+    targetDir=$(dirname "$target")
+    echo "$source -> $target"
+    mkdir -p "$targetDir"
+    cp "$source" "$target"
+done;
+
+# Substitute enviroment variable in any files located in the global gen source environment
+# and copy to the corresponding configuration directory
+for source in $(find "$globalEnvironmentGenSourcePath"  -mindepth 1 -type f -print | grep -v "~$")
+do
+    # The target directory 
+    target="$targetEnvironmentPath${source##$globalEnvironmentGenSourcePath}"
+    targetDir=$(dirname "$target")
+    echo "$source -> $target (with substitution)"
+    mkdir -p "$targetDir"
+    envsubst < "$source" > "$target"
+done;
+
+# Executes docker-compose for a specific enviroment named CONFIGURATION
+commandLine="docker-compose -f docker-compose.yml -f $configEnvironmentPath/docker-compose.yml --project-name $projectName $@"
+echo "Executing: $commandLine"
+eval "$commandLine"
