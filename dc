@@ -39,7 +39,9 @@
 #    a. Loads docker-compose.yml from the current directory
 #    b. Loads docker-compose.yml from the configuration directory
 # 4. Sets the --project-name to directoryName-configuration
-
+#
+# Environment:
+# If DC_DEBUG=1 dumps environment before execution
 
 
 set -eu
@@ -112,10 +114,10 @@ fi
 
 
 # Load environment (silently)
-export $(envsubst < "$rootEnvironmentPathname" | grep -v '^#')
-export $(envsubst < "$rootEnvironmentConfigPathname" | grep -v '^#')
-export $(envsubst < "$globalEnvironmentPathname" | grep -v '^#')
-export $(envsubst < "$configEnvironmentPathname" | grep -v '^#')
+export $(envsubst < "$rootEnvironmentPathname" | grep -v '^#')       > /dev/null
+export $(envsubst < "$rootEnvironmentConfigPathname" | grep -v '^#') > /dev/null
+export $(envsubst < "$globalEnvironmentPathname" | grep -v '^#')     > /dev/null
+export $(envsubst < "$configEnvironmentPathname" | grep -v '^#')     > /dev/null
 
 # Remove the target configuration directory to eliminate stale files
 rm -rf "$targetEnvironmentPath"
@@ -145,6 +147,14 @@ done;
 
 # Executes docker-compose for a specific enviroment named CONFIGURATION
 commandLine="docker-compose -f docker-compose.yml -f $configEnvironmentPath/docker-compose.yml --project-name $projectName $@"
-printenv
-echo "Executing: $commandLine"
+
+# Dump debug information if specified
+if [ ${DC_DEBUG:-0} = "1" ]
+then
+    printenv
+    echo "Executing: $commandLine"
+else
+    echo "To debug environment, set environment: DC_DEBUG=1"
+fi
+
 eval "$commandLine"
