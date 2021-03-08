@@ -13,7 +13,7 @@
 # │   │           └── nginx
 # │   │               └── sites-enabled
 # │   │                   ├── codermerlin.com.conf
-# │   └── app
+# │   └── prd
 # │       ├── docker-compose.yml
 # │       ├── docker-compose.yml~
 # │       ├── environment.conf
@@ -28,12 +28,17 @@
 #
 # 1. Loads environment
 #    a. Root (root/docker)
-#    b. Global (config/all)
-#    c. Configuration-specific (config/$configuration)
+#    b. RootConfig (root/docker/$configuration)
+#    c. Global (config/all)
+#    d. Configuration-specific (config/$configuration)
 # 2. Copies files
 #    a. Files under config/all/copy-source are copied as-is
 #    b. Files under config/all/gen-source are environment-substituted
 #       NB: If substitution is not desired, replace the "$" with "${DOLLAR}"
+# 3. Loads .yml files
+#    a. Loads docker-compose.yml from the current directory
+#    b. Loads docker-compose.yml from the configuration directory
+# 4. Sets the --project-name to directoryName-configuration
 
 
 
@@ -53,6 +58,7 @@ configEnvironmentPath=./config/$configuration
 targetEnvironmentPath=$configEnvironmentPath/target
 
 rootEnvironmentPathname=$rootEnvironmentPath/environment.conf
+rootEnvironmentConfigPathname=$rootEnvironmentPath/environment-$configuration.conf
 globalEnvironmentPathname=$globalEnvironmentPath/environment.conf
 configEnvironmentPathname=$configEnvironmentPath/environment.conf
 
@@ -86,6 +92,12 @@ then
     exit 1
 fi
 
+if [ ! -f "$rootEnvironmentConfigPathname" ]
+then
+    echo "Unable to find environment '$rootEnvironmentConfigPathname'"
+    exit 1
+fi
+
 if [ ! -f "$globalEnvironmentPathname" ]
 then
     echo "Unable to find environment '$globalEnvironmentPathname'"
@@ -99,10 +111,11 @@ then
 fi
 
 
-# Load environment
-export $(cat "$rootEnvironmentPathname" | grep -v '^#') > /dev/null
-export $(cat "$globalEnvironmentPathname" | grep -v '^#') > /dev/null
-export $(cat "$configEnvironmentPathname" | grep -v '^#') > /dev/null
+# Load environment (silently)
+export $(envsubst < "$rootEnvironmentPathname" | grep -v '^#')
+export $(envsubst < "$rootEnvironmentConfigPathname" | grep -v '^#')
+export $(envsubst < "$globalEnvironmentPathname" | grep -v '^#')
+export $(envsubst < "$configEnvironmentPathname" | grep -v '^#')
 
 # Remove the target configuration directory to eliminate stale files
 rm -rf "$targetEnvironmentPath"
@@ -132,5 +145,6 @@ done;
 
 # Executes docker-compose for a specific enviroment named CONFIGURATION
 commandLine="docker-compose -f docker-compose.yml -f $configEnvironmentPath/docker-compose.yml --project-name $projectName $@"
+printenv
 echo "Executing: $commandLine"
 eval "$commandLine"
