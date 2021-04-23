@@ -1,0 +1,36 @@
+#!/bin/bash
+# 1. Loads environment
+#    a. Root (root/docker)
+
+set -eu
+
+# Ensure running as root
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Set parameters
+rootEnvironmentPath=/root/docker
+rootEnvironmentPathname=$rootEnvironmentPath/environment.conf
+
+# Export relevant variables
+# The DOLLAR entry allows us to escape values which we don't want to interpolate
+export DOLLAR='$'
+
+# Load environment (silently)
+export $(envsubst < "$rootEnvironmentPathname" | grep -v '^#')       > /dev/null
+
+# Execute the specified command line
+commandLine="$@"
+
+# Dump debug information if specified
+if [ ${BB_DEBUG:-0} = "1" ]
+then
+    printenv
+    echo "Executing: $commandLine"
+else
+    echo "To debug environment, set environment: DC_DEBUG=1"
+fi
+
+eval "$commandLine"

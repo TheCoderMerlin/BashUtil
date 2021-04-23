@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# 0. Environment MUST be loaded with 'dcenv'
+# 1. Copies the targetEnvironment to the runtimeEnvironment
+#
+
+set -eu
+
+rm -rf "$runtimeEnvironmentPath"
+cp -rp "$targetEnvironmentPath" "$runtimeEnvironmentPath"
+
