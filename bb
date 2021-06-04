@@ -8,6 +8,5 @@ set -eu
 
 export B2_APPLICATION_KEY_ID=$DOCKER_com_backblaze_key_id
 export B2_APPLICATION_KEY=$DOCKER_com_backblaze_application_key
-commandLine="b2 $@"
+commandLine="/usr/local/bin/b2 $@"
 eval "$commandLine"
-
