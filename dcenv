@@ -42,7 +42,9 @@
 # 4. Docker-compose may reference the target directory
 #    with the environment variable $targetEnvironmentPath
 # 5. Sets the --project-name to directoryName-configuration
-
+#
+# To debug environment, set environment: DC_DEBUG=1"
+#
 set -eu
 
 # Ensure running as root
@@ -146,7 +148,11 @@ do
     # The target directory 
     target="$targetEnvironmentPath${source##$globalEnvironmentCopySourcePath}"
     targetDir=$(dirname "$target")
-    echo "$source -> $target"
+    if [ ${DC_DEBUG:-0} = "1" ]
+    then
+	echo "$source -> $target"
+    fi
+    
     mkdir -p "$targetDir"
     cp "$source" "$target"
 done;
@@ -158,7 +164,11 @@ do
     # The target directory 
     target="$targetEnvironmentPath${source##$globalEnvironmentGenSourcePath}"
     targetDir=$(dirname "$target")
-    echo "$source -> $target (with substitution)"
+    if [ ${DC_DEBUG:-0} = "1" ]
+    then
+	echo "$source -> $target (with substitution)"
+    fi
+    
     mkdir -p "$targetDir"
     envsubst < "$source" > "$target"
 done;
@@ -197,8 +207,6 @@ if [ ${DC_DEBUG:-0} = "1" ]
 then
     printenv
     echo "Executing: $commandLine"
-else
-    echo "To debug environment, set environment: DC_DEBUG=1"
 fi
 
 eval "$commandLine"
